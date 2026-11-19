@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="theme-color" content="#101b2b">
+<title>متسلق الجرف</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="gameShell">
+  <canvas id="game" aria-label="لعبة تسلق الجبل"></canvas>
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span><span>متسلق الجرف</span></div>
+    <div class="stats"><span>الارتفاع</span><strong id="height">0 م</strong><span class="divider">|</span><span>أفضل ارتفاع</span><strong id="best">0 م</strong></div>
+    <button id="fullscreen" class="iconBtn" aria-label="ملء الشاشة" title="ملء الشاشة">⛶</button>
+  </div>
+  <div id="hint" class="hint">امسك زر اليد اليسرى أو اليمنى للتشبث بالصخور، ثم اسحب جسمك لأعلى بالتبادل.</div>
+  <section class="controls" aria-label="أزرار التحكم">
+    <div class="handControl">
+      <span class="handLabel">اليد اليسرى</span>
+      <button class="handBtn left" id="leftBtn"><span>✋</span><small>تعلّق</small></button>
+    </div>
+    <div class="centerControls">
+      <button class="moveBtn" id="upBtn" aria-label="تحرك لأعلى">▲</button>
+      <button class="moveBtn" id="downBtn" aria-label="تحرك لأسفل">▼</button>
+    </div>
+    <div class="handControl">
+      <span class="handLabel">اليد اليمنى</span>
+      <button class="handBtn right" id="rightBtn"><span>✋</span><small>تعلّق</small></button>
+    </div>
+  </section>
+  <div id="overlay" class="overlay">
+    <div class="panel">
+      <div class="mountainMark">⛰</div>
+      <p class="eyebrow">تحدي التسلق</p><h1>متسلق الجرف</h1>
+      <p class="intro">استخدم ذراعيك الطويلتين للتشبث بنتوءات الجبل. لا تترك اليدين معًا، وحاول الوصول لأعلى ارتفاع!</p>
+      <button id="startBtn" class="primary">ابدأ التسلق</button>
+      <p class="subnote">مصممة للموبايل — يمكن اللعب باللمس أو لوحة المفاتيح</p>
+    </div>
+  </div>
+  <div id="gameOver" class="overlay hidden">
+    <div class="panel"><div class="mountainMark">💥</div><p class="eyebrow">انتهت المحاولة</p><h2>سقطت من الجبل!</h2><p class="intro">وصلت إلى ارتفاع <strong id="finalHeight">0</strong> متر.</p><button id="retryBtn" class="primary">حاول مرة أخرى</button></div>
+  </div>
+</main>
+<script src="game.js"></script>
+</body></html>
