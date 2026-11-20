@@ -3,7 +3,7 @@ const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
 const $=id=>document.getElementById(id);
 let W=0,H=0,dpr=1,rocks=[],particles=[],running=false,over=false,frame=0,cameraY=0,worldHeight=0,best=Number(localStorage.getItem('cliffBest')||0),lastTime=0;
 const player={x:0,y:0,vx:0,vy:0,left:null,right:null,phase:0};
-const keys={up:false,down:false};
+let gyroEnabled=false,gyroNeutral=null,gyroValue=0,gyroRaw=0;
 $('best').textContent=best+' م';
 function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);if(!running&&!over)resetWorld();}
 function resetWorld(){cameraY=0;worldHeight=0;frame=0;rocks=[];particles=[];player.x=W/2;player.y=H*.69;player.vx=0;player.vy=0;player.left=null;player.right=null;generateRocks();}
@@ -15,15 +15,23 @@ function release(side){player[side]=null;}
 function burst(x,y,color){for(let i=0;i<7;i++)particles.push({x,y,vx:(Math.random()-.5)*4,vy:(Math.random()-.8)*4,life:25,color});}
 function bindHold(id,down,up){const el=$(id);el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);down();el.classList.add('active');});const end=e=>{e.preventDefault();up();el.classList.remove('active');};el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('lostpointercapture',()=>{up();el.classList.remove('active');});}
 bindHold('leftBtn',()=>grab('left'),()=>release('left'));bindHold('rightBtn',()=>grab('right'),()=>release('right'));
-bindHold('upBtn',()=>keys.up=true,()=>keys.up=false);bindHold('downBtn',()=>keys.down=true,()=>keys.down=false);
-window.addEventListener('keydown',e=>{if(e.code==='ArrowUp'||e.code==='Space')keys.up=true;if(e.code==='ArrowDown')keys.down=true;if(e.code==='KeyA')grab('left');if(e.code==='KeyD')grab('right');});window.addEventListener('keyup',e=>{if(e.code==='ArrowUp'||e.code==='Space')keys.up=false;if(e.code==='ArrowDown')keys.down=false;if(e.code==='KeyA')release('left');if(e.code==='KeyD')release('right');});
+window.addEventListener('keydown',e=>{if(e.code==='KeyA')grab('left');if(e.code==='KeyD')grab('right');});window.addEventListener('keyup',e=>{if(e.code==='KeyA')release('left');if(e.code==='KeyD')release('right');});
 function start(){resetWorld();running=true;over=false;$('overlay').classList.add('hidden');$('gameOver').classList.add('hidden');$('hint').style.display='block';lastTime=performance.now();requestAnimationFrame(loop);}
 $('startBtn').onclick=start;$('retryBtn').onclick=start;
+async function toggleGyro(){
+  if(gyroEnabled){gyroEnabled=false;gyroValue=0;gyroRaw=0;window.removeEventListener('deviceorientation',onOrientation);$('gyroBtn').classList.remove('enabled');$('gyroBtn').innerHTML='📱<small>ميل الهاتف</small>';$('hint').textContent='تم إيقاف الجيروسكوب. يمكنك استخدام أزرار الشاشة.';return;}
+  if(!('DeviceOrientationEvent' in window)){ $('hint').textContent='هذا المتصفح لا يدعم مستشعر ميل الهاتف. استخدم أزرار الشاشة.';return;}
+  try{if(typeof DeviceOrientationEvent.requestPermission==='function'){const permission=await DeviceOrientationEvent.requestPermission();if(permission!=='granted'){ $('hint').textContent='لم يتم السماح باستخدام مستشعر الحركة. يمكنك تفعيله من إعدادات المتصفح.';return;}}
+    gyroNeutral=null;gyroValue=0;gyroRaw=0;window.addEventListener('deviceorientation',onOrientation);gyroEnabled=true;$('gyroBtn').classList.add('enabled');$('gyroBtn').innerHTML='✓<small>الميل مفعّل</small>';$('hint').textContent='حرّك الهاتف يمينًا ويسارًا. أمسكه مستقيمًا للحظة لإعادة ضبط المنتصف.';
+  }catch(e){$('hint').textContent='تعذر تفعيل مستشعر الحركة. تأكد من أذونات المتصفح.';}
+}
+function onOrientation(e){if(e.gamma===null||e.gamma===undefined)return;if(gyroNeutral===null)gyroNeutral=e.gamma;const delta=e.gamma-gyroNeutral;const dead=3;gyroRaw=Math.abs(delta)<dead?0:Math.max(-1,Math.min(1,(delta-Math.sign(delta)*dead)/22));}
+$('gyroBtn').addEventListener('click',toggleGyro);
 $('fullscreen').onclick=async()=>{try{if(!document.fullscreenElement){await document.documentElement.requestFullscreen();}else await document.exitFullscreen();}catch(e){$('hint').textContent='ملء الشاشة غير مدعوم في هذا المتصفح — جرّب فتح اللعبة من قائمة المتصفح.';}};
 function endGame(){running=false;over=true;const h=Math.max(0,Math.floor(worldHeight/10));$('finalHeight').textContent=h;$('gameOver').classList.remove('hidden');if(h>best){best=h;localStorage.setItem('cliffBest',best);$('best').textContent=best+' م';}}
 function update(dt){frame++;const held=Number(!!player.left)+Number(!!player.right);let pull=0;if(player.left)pull+=player.left.y-player.y;if(player.right)pull+=player.right.y-player.y;
 if(held){player.vy+=(pull/held-player.vy)*.095;player.vx+=(((player.left&&player.right)?(player.left.x+player.right.x)/2:player.left?player.left.x:player.right.x)-player.x)*.006;}else{player.vy+=.19;}
-if(keys.up&&held)player.vy-=.34;if(keys.down)player.vy+=.2;player.vx*=.94;player.vy*=.985;player.x+=player.vx*dt;player.y+=player.vy*dt;
+if(held){const autoClimb=player.left&&player.right?1.05:.72;player.vy=Math.min(player.vy,-autoClimb);}if(gyroEnabled){gyroValue+=(gyroRaw-gyroValue)*Math.min(1,.18*dt);player.vx+=gyroValue*.34*dt;}player.vx*=.94;player.vy*=.985;player.x+=player.vx*dt;player.y+=player.vy*dt;
 player.x=Math.max(35,Math.min(W-35,player.x));
 if(player.y<cameraY+H*.37){cameraY=player.y-H*.37;worldHeight=Math.max(worldHeight,-cameraY);}
 if(player.y-cameraY>H+90){endGame();}
