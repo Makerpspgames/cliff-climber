@@ -16,8 +16,29 @@ function burst(x,y,color){for(let i=0;i<7;i++)particles.push({x,y,vx:(Math.rando
 function bindHold(id,down,up){const el=$(id);el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture(e.pointerId);down();el.classList.add('active');});const end=e=>{e.preventDefault();up();el.classList.remove('active');};el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('lostpointercapture',()=>{up();el.classList.remove('active');});}
 bindHold('leftBtn',()=>grab('left'),()=>release('left'));bindHold('rightBtn',()=>grab('right'),()=>release('right'));
 window.addEventListener('keydown',e=>{if(e.code==='KeyA')grab('left');if(e.code==='KeyD')grab('right');});window.addEventListener('keyup',e=>{if(e.code==='KeyA')release('left');if(e.code==='KeyD')release('right');});
-function start(){resetWorld();running=true;over=false;$('overlay').classList.add('hidden');$('gameOver').classList.add('hidden');$('hint').style.display='block';lastTime=performance.now();requestAnimationFrame(loop);}
-$('startBtn').onclick=start;$('retryBtn').onclick=start;
+function start(e){
+  if(e){e.preventDefault();e.stopPropagation();}
+  // Reset and establish two initial handholds before starting the animation loop.
+  running=false;over=false;resetWorld();
+  const startY=player.y+28;
+  const startLeft={x:Math.max(35,player.x-52),y:startY,w:54,h:24,used:true};
+  const startRight={x:Math.min(W-35,player.x+52),y:startY+8,w:54,h:24,used:true};
+  rocks.push(startLeft,startRight);
+  player.left={x:startLeft.x,y:startLeft.y-5,rock:startLeft};
+  player.right={x:startRight.x,y:startRight.y-5,rock:startRight};
+  $('overlay').classList.add('hidden');
+  $('gameOver').classList.add('hidden');
+  $('hint').style.display='block';
+  running=true;lastTime=performance.now();
+  requestAnimationFrame(loop);
+}
+// Bind both click and touch-friendly pointer activation; ignore duplicate synthetic clicks.
+['startBtn','retryBtn'].forEach(id=>{
+  const button=$(id);
+  button.type='button';
+  button.addEventListener('click',start);
+  button.addEventListener('pointerup',e=>{if(e.pointerType==='touch'){e.preventDefault();start(e);}});
+});
 async function toggleGyro(){
   if(gyroEnabled){gyroEnabled=false;gyroValue=0;gyroRaw=0;window.removeEventListener('deviceorientation',onOrientation);$('gyroBtn').classList.remove('enabled');$('gyroBtn').innerHTML='📱<small>ميل الهاتف</small>';$('hint').textContent='تم إيقاف الجيروسكوب. يمكنك استخدام أزرار الشاشة.';return;}
   if(!('DeviceOrientationEvent' in window)){ $('hint').textContent='هذا المتصفح لا يدعم مستشعر ميل الهاتف. استخدم أزرار الشاشة.';return;}
@@ -44,7 +65,7 @@ function drawPlayer(){const x=player.x,y=worldToScreen(player.y),lx=player.left,
 // extra-long elastic arms
  drawLimb(x-10,y-24,leftX,leftY,13,'#c9855f');drawLimb(x+10,y-24,rightX,rightY,13,'#c9855f');
 // hands
- for(const [hx,hy,active] of [[leftX,leftY,!!lx],[rightX,rightY,!!rx]]){ctx.fillStyle=active?'#ffd09a':'#d99570';ctx.beginPath();ctx.arc(hx,hy,10,0,Math.PI*2);ctx.fill();for(let i=0;i<4;i++){ctx.beginPath();ctx.roundRect(hx-7+i*4,hy-16,3,11,2);ctx.fill();}}
+ for(const [hx,hy,active] of [[leftX,leftY,!!lx],[rightX,rightY,!!rx]]){ctx.fillStyle=active?'#ffd09a':'#d99570';ctx.beginPath();ctx.arc(hx,hy,10,0,Math.PI*2);ctx.fill();for(let i=0;i<4;i++){ctx.beginPath();if(typeof ctx.roundRect==='function'){ctx.roundRect(hx-7+i*4,hy-16,3,11,2);}else{ctx.rect(hx-7+i*4,hy-16,3,11);}ctx.fill();}}
  // torso and legs
  ctx.strokeStyle='#17283a';ctx.lineWidth=19;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x,y-22);ctx.lineTo(x,y+22);ctx.stroke();ctx.strokeStyle='#e4a16f';ctx.lineWidth=13;ctx.beginPath();ctx.moveTo(x-5,y+15);ctx.lineTo(x-21,y+43);ctx.moveTo(x+5,y+15);ctx.lineTo(x+21,y+43);ctx.stroke();ctx.fillStyle='#d99570';ctx.beginPath();ctx.arc(x,y-39,15,0,Math.PI*2);ctx.fill();ctx.fillStyle='#302a2a';ctx.beginPath();ctx.arc(x,y-44,15,Math.PI,Math.PI*2);ctx.fill();}
 function draw(){ctx.clearRect(0,0,W,H);const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#172b43');sky.addColorStop(.55,'#8a6470');sky.addColorStop(1,'#e4a16f');ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
@@ -56,6 +77,6 @@ ctx.beginPath();ctx.moveTo(W*.22,0);ctx.lineTo(W*.88,0);ctx.lineTo(W*.76,H);ctx.
 ctx.strokeStyle='#e4c0a033';ctx.lineWidth=3;for(let i=0;i<16;i++){const yy=((i*115+cameraY*.3)% (H+100))-40;ctx.beginPath();ctx.moveTo(W*.17,yy);ctx.quadraticCurveTo(W*.5,yy+20,W*.84,yy-8);ctx.stroke();}
 rocks.forEach(drawRock);drawPlayer();for(const p of particles){ctx.globalAlpha=p.life/25;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,worldToScreen(p.y),3,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;}
 }
-function loop(t){if(!running)return;const dt=Math.min(2,(t-lastTime)/16.67||1);lastTime=t;update(dt);draw();if(running)requestAnimationFrame(loop);}
+function loop(t){if(!running)return;try{const dt=Math.min(2,(t-lastTime)/16.67||1);lastTime=t;update(dt);draw();if(running)requestAnimationFrame(loop);}catch(err){running=false;console.error('Cliff Climber runtime error:',err);$('hint').textContent='حدث خطأ أثناء تشغيل اللعبة. حدّث الصفحة وحاول مرة أخرى.';$('overlay').classList.remove('hidden');}}
 window.addEventListener('resize',resize);window.addEventListener('orientationchange',()=>setTimeout(resize,150));resize();draw();
 })();
